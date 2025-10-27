@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Codex Profano — Altar Místico (React PWA)</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23000000'/><text x='50' y='57' font-size='48' text-anchor='middle' fill='%23d4af37' font-family='serif'>✦</text></svg>">
+<!-- React + ReactDOM via CDN -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<style>
+  :root{
+    --bg1:#040203; --bg2:#0b0708; --accent:#d4af37; --muted:#cfc0a0; --card:#0d0d0d;
+  }
+  html,body{height:100%;margin:0;font-family: Georgia, "Times New Roman", serif;background:radial-gradient(ellipse at 20% 10%, rgba(212,175,55,0.03), transparent 20%), linear-gradient(180deg,var(--bg1),var(--bg2)); color:var(--muted);}
+  #root{max-width:1100px;margin:18px auto;padding:18px;}
+  header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .title{color:var(--accent);font-weight:800;letter-spacing:1px}
+  .subtitle{font-size:12px;color:#efe2b8}
+  .layout{display:grid;grid-template-columns:1fr 360px;gap:18px;margin-top:18px}
+  .stage{position:relative;min-height:640px;border-radius:12px;padding:18px;box-shadow:0 12px 40px rgba(0,0,0,.6);background:linear-gradient(180deg,#080808,#0b0b0b)}
+  .altar{position:absolute;inset:0;pointer-events:none;opacity:.14;background-image:
+    radial-gradient(circle at 20% 10%, rgba(212,175,55,0.06), transparent 8%),
+    radial-gradient(circle at 80% 80%, rgba(212,175,55,0.03), transparent 12%);}
+  .candle{position:absolute;left:28px;bottom:24px;width:44px;height:130px;background:linear-gradient(180deg,#1a120a,#2b1a0d);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.8)}
+  .cardFrame{width:420px;max-width:92%;height:280px;border-radius:14px;padding:18px;margin:36px auto;background:linear-gradient(180deg,#090909,#0e0e0e);border:1px solid rgba(212,175,55,.08);box-shadow:0 18px 60px rgba(0,0,0,.65);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:transform .45s cubic-bezier(.2,.9,.3,1),opacity .3s}
+  .card-hidden{opacity:0;transform:scale(.96) translateY(18px)}
+  .card-anim{animation:popIn .6s cubic-bezier(.2,.9,.3,1)}
+  @keyframes popIn{0%{transform:translateY(18px) scale(.96) rotate(-2deg);opacity:0}60%{transform:translateY(-6px) scale(1.02) rotate(1deg);opacity:1}100%{transform:translateY(0) scale(1) rotate(0)}}
+  .card-cat{font-size:13px;color:#f3e7c0;margin-bottom:6px}
+  .card-title{font-size:20px;color:var(--accent);font-weight:800;letter-spacing:.6px;margin-bottom:8px;text-align:center}
+  .card-pt{font-size:16px;color:#f6e6be;text-align:center;margin-bottom:8px}
+  .card-en{font-size:13px;color:#ddd;text-align:center}
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;z-index:3;position:relative}
+  button{background:transparent;border:1px solid rgba(212,175,55,.12);color:var(--accent);padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700}
+  .primary{background:linear-gradient(90deg,#231800,#3a2b00);border-color:rgba(212,175,55,.4)}
+  .invoca{background:linear-gradient(90deg,#3b2200,#442a00);border-color:rgba(212,175,55,.6);padding:12px 14px}
+  .sidebar{background:linear-gradient(180deg,#0b0b0b,#0a0a0a);padding:16px;border-radius:12px;min-height:640px;box-shadow:0 6px 20px rgba(0,0,0,.6)}
+  label{display:block;font-size:13px;margin-bottom:6px;color:var(--muted)}
+  select,input,textarea{width:100%;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--muted)}
+  .list{max-height:220px;overflow:auto;padding:6px;background:linear-gradient(180deg,#070707,#0b0b0b);border-radius:8px}
+  footer{margin-top:14px;text-align:center;color:#bdbdbd;font-size:12px}
+  .small{font-size:13px;color:#cfc0a0}
+  .lang-toggle{border-radius:999px;padding:6px 10px;background:rgba(212,175,55,0.05);font-weight:800;color:var(--accent)}
+  @media (max-width:980px){ .layout{grid-template-columns:1fr} .candle{left:12px;bottom:6px}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+const e = React.createElement;
+const { useState, useEffect, useRef } = React;
+
+/* ---------- Deck data: 105 cartas (PT/EN) including 15 rare Eclipse cards ---------- */
+const BASE_DECK = (function(){
+  const deck = [
+    // Gostosuras 15
+    {cat:"Gostosuras", titlePT:"O Beijo Doce", titleEN:"The Sweet Kiss", textPT:"Dê um beijo doce no seu crush.", textEN:"Give your crush a sweet kiss."},
+    {cat:"Gostosuras", titlePT:"Açúcar ou Veneno", titleEN:"Sugar or Venom", textPT:"Escolha alguém. Faça um elogio sincero... ou uma provocação fofa.", textEN:"Choose someone. Give a genuine compliment… or a cute tease."},
+    {cat:"Gostosuras", titlePT:"A Tentação do Copo", titleEN:"The Temptation of the Glass", textPT:"Brinde com quem te olhar primeiro. Ambos bebem e riem.", textEN:"Toast with the first person who meets your gaze. You both drink and laugh."},
+    {cat:"Gostosuras", titlePT:"Doce Maldade", titleEN:"Sweet Mischief", textPT:"Ofereça um doce imaginário. Se recusar, cante um verso.", textEN:"Offer an imaginary treat. If refused, sing a random verse."},
+    {cat:"Gostosuras", titlePT:"Riso Enfeitiçado", titleEN:"Enchanted Laughter", textPT:"Faça todos rirem — ou beba até que consigam.", textEN:"Make everyone laugh — or drink until they manage to laugh."},
+    {cat:"Gostosuras", titlePT:"Brilho no Olhar", titleEN:"Sparkle in the Eyes", textPT:"Diga o que chama atenção no olhar de alguém.", textEN:"Say what catches your eye about someone's gaze."},
+    {cat:"Gostosuras", titlePT:"Feitiço de Afeto", titleEN:"Charm of Affection", textPT:"Dê um abraço; se ambos sentirem, troquem um gole.", textEN:"Give a hug; if mutual, share a sip."},
+    {cat:"Gostosuras", titlePT:"Açúcar Derretido", titleEN:"Melted Sugar", textPT:"Conte algo fofo que faria por amor.", textEN:"Tell something sweet you'd do for love."},
+    {cat:"Gostosuras", titlePT:"Flor de Riso", titleEN:"Bloom of Laughter", textPT:"Brinde a quem tem o sorriso mais encantador.", textEN:"Toast to whoever has the most charming smile."},
+    {cat:"Gostosuras", titlePT:"Sussurro de Mel", titleEN:"Whisper of Honey", textPT:"Sussurre algo gentil no ouvido de alguém.", textEN:"Whisper something kind into someone's ear."},
+    {cat:"Gostosuras", titlePT:"O Gole da Fada", titleEN:"The Fairy's Sip", textPT:"Todos bebem um gole em homenagem à Fada das Gostosuras.", textEN:"Everyone takes a small sip in honor of the Fairy of Treats."},
+    {cat:"Gostosuras", titlePT:"Encanto do Espelho", titleEN:"Mirror Charm", textPT:"Diga algo bonito sobre si. Se hesitar, alguém diz por você.", textEN:"Say something beautiful about yourself. If you hesitate, someone says it for you."},
+    {cat:"Gostosuras", titlePT:"Poção de Riso", titleEN:"Potion of Laughter", textPT:"Escolha uma palavra engraçada; quem rir, bebe.", textEN:"Pick a funny word; whoever laughs drinks."},
+    {cat:"Gostosuras", titlePT:"Desejo Açucarado", titleEN:"Sugary Wish", textPT:"Faça um pedido secreto e beba para selar.", textEN:"Make a secret sweet wish and drink to seal it."},
+    {cat:"Gostosuras", titlePT:"Coração Caramelizado", titleEN:"Caramel Heart", textPT:"Diga 'você ganhou meu coração caramelizado' e explique.", textEN:"Say 'you've won my caramel heart' and explain why."},
+
+    // Picantes 15
+    {cat:"Picantes", titlePT:"Mordida do Vampiro", titleEN:"Vampire's Bite", textPT:"Finja morder no pescoço. Se sorrir, ambos bebem.", textEN:"Pretend to bite the neck. If they smile, you both drink."},
+    {cat:"Picantes", titlePT:"Toque de Tentação", titleEN:"Touch of Temptation", textPT:"Brinde olhando nos olhos até um desviar. Quem ceder, bebe.", textEN:"Toast locking eyes until one looks away. The one who looks away drinks."},
+    {cat:"Picantes", titlePT:"Confissão Ardente", titleEN:"Burning Confession", textPT:"Conte um desejo proibido (real ou inventado).", textEN:"Reveal a forbidden desire, real or made up."},
+    {cat:"Picantes", titlePT:"Calor da Noite", titleEN:"Heat of the Night", textPT:"Dance 15s com alguém; mesa julga o 'fogo'.", textEN:"Dance 15s with someone; group rates the heat."},
+    {cat:"Picantes", titlePT:"Sopro Quente", titleEN:"Hot Breath", textPT:"Sussurre algo provocante com voz angelical.", textEN:"Whisper something spicy in your sweetest voice."},
+    {cat:"Picantes", titlePT:"Tentação Líquida", titleEN:"Liquid Temptation", textPT:"Beba e ofereça o mesmo gole a quem te chama atenção.", textEN:"Take a sip and offer it to whoever catches your eye."},
+    {cat:"Picantes", titlePT:"Feitiço da Sedução", titleEN:"Seduction Spell", textPT:"Mostre seu olhar mais sedutor; se ninguém rir, aplausos.", textEN:"Give your most seductive look. If no one laughs, applause."},
+    {cat:"Picantes", titlePT:"Calafrio", titleEN:"Chill and Thrill", textPT:"Escolha alguém para te dar um 'calafrio'.", textEN:"Pick someone to give you a chill via compliment or touch."},
+    {cat:"Picantes", titlePT:"Jogo do Desejo", titleEN:"Game of Desire", textPT:"Escolha 'verdade' ou 'toque'. À esquerda decide.", textEN:"Choose 'truth' or 'touch'. The person on your left decides."},
+    {cat:"Picantes", titlePT:"Brinde Infernal", titleEN:"Infernal Toast", textPT:"Brinde com a pessoa mais misteriosa da mesa.", textEN:"Toast with the most mysterious person at the table."},
+    {cat:"Picantes", titlePT:"Fogo Cruzado", titleEN:"Crossfire", textPT:"Faça uma pergunta picante; sem resposta = 2 goles.", textEN:"Ask someone a spicy question; no answer = 2 sips."},
+    {cat:"Picantes", titlePT:"Beijo Imaginário", titleEN:"Imaginary Kiss", textPT:"Diga onde daria um beijo, se pudesse.", textEN:"Say where you'd kiss someone, if you could."},
+    {cat:"Picantes", titlePT:"Desejo Sombrio", titleEN:"Dark Desire", textPT:"Sussurre um feitiço; alvo aceita ou quebra.", textEN:"Whisper a spell; target accepts or breaks it."},
+    {cat:"Picantes", titlePT:"Vampiro da Meia-Noite", titleEN:"Midnight Vampire", textPT:"Finja ser vampiro; se a presa rir, inverte.", textEN:"Pretend to be a vampire; if prey laughs, spell reverses."},
+    {cat:"Picantes", titlePT:"Ardor Profano", titleEN:"Profane Heat", textPT:"Diga: 'O calor entre nós é parte do ritual.'", textEN:"Say: 'The heat between us is part of the ritual'."},
+
+    // Travessuras 15
+    {cat:"Travessuras", titlePT:"Travessura Clássica", titleEN:"Classic Trick", textPT:"Imite um monstro famoso. Se não adivinharem, você bebe.", textEN:"Imitate a famous monster. If no one guesses, you drink."},
+    {cat:"Travessuras", titlePT:"Maldição do Papel Higiênico", titleEN:"Toilet Paper Curse", textPT:"Transforme alguém em múmia com o que houver.", textEN:"Turn someone into a mummy with nearby materials."},
+    {cat:"Travessuras", titlePT:"Riso Proibido", titleEN:"Forbidden Laughter", textPT:"Não ria por 30s enquanto todos te encaram.", textEN:"Don't laugh for 30s while everyone stares."},
+    {cat:"Travessuras", titlePT:"Eco Fantasma", titleEN:"Ghost Echo", textPT:"Repita tudo que a pessoa à sua direita disser por 1min.", textEN:"Repeat everything the person to your right says for 1min."},
+    {cat:"Travessuras", titlePT:"Caos Instantâneo", titleEN:"Instant Chaos", textPT:"Escolha dois jogadores e troque suas bebidas.", textEN:"Pick two players and swap their drinks."},
+    {cat:"Travessuras", titlePT:"Rir ou Beber", titleEN:"Laugh or Drink", textPT:"Conte uma piada; se ninguém rir, você bebe.", textEN:"Tell a joke; if no one laughs, you drink."},
+    {cat:"Travessuras", titlePT:"Travessura Sonora", titleEN:"Sound Mischief", textPT:"Crie um som assustador; pior imitador bebe.", textEN:"Make a scary sound; worst imitator drinks."},
+    {cat:"Travessuras", titlePT:"Dublagem Demoníaca", titleEN:"Demonic Dubbing", textPT:"Dub a fala de alguém como um demônio.", textEN:"Dub someone's speech as a demon."},
+    {cat:"Travessuras", titlePT:"Poção Trocada", titleEN:"Swapped Potion", textPT:"Troque seu copo com o de alguém.", textEN:"Swap your glass with someone's."},
+    {cat:"Travessuras", titlePT:"Dança dos Espíritos", titleEN:"Dance of Spirits", textPT:"Todos dançam 20s; quem parar primeiro bebe.", textEN:"Dance 20s; whoever stops first drinks."},
+    {cat:"Travessuras", titlePT:"Sombra Risonha", titleEN:"Laughing Shadow", textPT:"Imite alguém até que percebam.", textEN:"Mimic someone until they notice."},
+    {cat:"Travessuras", titlePT:"Voz dos Mortos", titleEN:"Voice of the Dead", textPT:"Fale como fantasma até sua próxima vez.", textEN:"Speak like a ghost until your next turn."},
+    {cat:"Travessuras", titlePT:"Travessura Tripla", titleEN:"Triple Trouble", textPT:"Escolha 3: um ri, um bebe, um dança.", textEN:"Choose 3 people: one laughs, one drinks, one dances."},
+    {cat:"Travessuras", titlePT:"Maldição da Risada", titleEN:"Laughing Curse", textPT:"Até o fim da rodada termine frases com risada.", textEN:"Until round end, end your sentences with a laugh."},
+    {cat:"Travessuras", titlePT:"O Duende Está Solto", titleEN:"The Imp is Loose", textPT:"Todos trocam de lugar; último sentado bebe.", textEN:"Everyone switches seats; last one sitting drinks."},
+
+    // Consequências 15
+    {cat:"Consequências", titlePT:"Castigo do Zumbi", titleEN:"Zombie's Punishment", textPT:"Fique imóvel como zumbi até sua próxima vez.", textEN:"Stay frozen like a zombie until your next turn."},
+    {cat:"Consequências", titlePT:"Mão do Destino", titleEN:"Hand of Fate", textPT:"Escolha alguém para cumprir sua consequência.", textEN:"Choose someone to take your consequence."},
+    {cat:"Consequências", titlePT:"Olhar Amaldiçoado", titleEN:"Cursed Gaze", textPT:"Olhe 15s sem piscar; quem piscar bebe.", textEN:"Stare 15s; whoever blinks drinks."},
+    {cat:"Consequências", titlePT:"Voz da Maldição", titleEN:"Voice of the Curse", textPT:"Fale com voz de morto-vivo até alguém elogiar.", textEN:"Speak in zombie voice until someone compliments you."},
+    {cat:"Consequências", titlePT:"Julgamento Sombrio", titleEN:"Dark Judgment", textPT:"O grupo decide uma tarefa; recusar = 3 goles.", textEN:"Group assigns a task; refuse = 3 sips."},
+    {cat:"Consequências", titlePT:"Poção Amarga", titleEN:"Bitter Potion", textPT:"Misture restos de 3 bebidas e tome um gole.", textEN:"Mix leftovers of 3 drinks and sip."},
+    {cat:"Consequências", titlePT:"Maldade Reversa", titleEN:"Reverse Mischief", textPT:"Quem te fez rir escolhe sua punição.", textEN:"Who last made you laugh chooses your punishment."},
+    {cat:"Consequências", titlePT:"O Grito da Noite", titleEN:"Night's Scream", textPT:"Solte um grito dramático.", textEN:"Let out a dramatic scream."},
+    {cat:"Consequências", titlePT:"O Peso da Culpa", titleEN:"Weight of Guilt", textPT:"Confesse algo vergonhoso.", textEN:"Confess something embarrassing."},
+    {cat:"Consequências", titlePT:"Corrente da Loucura", titleEN:"Chain of Madness", textPT:"Escolha alguém; se um beber, o outro também.", textEN:"Choose someone; if one drinks, both drink."},
+    {cat:"Consequências", titlePT:"Destino Cruel", titleEN:"Cruel Fate", textPT:"Role um dado imaginário; beba o número.", textEN:"Roll an imaginary die; drink that many sips."},
+    {cat:"Consequências", titlePT:"Fardo do Bruxo", titleEN:"Warlock's Burden", textPT:"Diga frase sombria quando alguém rir até o fim da rodada.", textEN:"Say a dark sentence whenever someone laughs until round end."},
+    {cat:"Consequências", titlePT:"Maldade em Dobro", titleEN:"Double Trouble", textPT:"Escolha parceiro; se um errar brinde, ambos bebem.", textEN:"Choose a partner; if one misses a toast, both drink."},
+    {cat:"Consequências", titlePT:"Julgamento da Lua", titleEN:"Moon's Trial", textPT:"Aponte o mais suspeito; ele faz algo inusitado.", textEN:"Point to the most suspicious; they must do something unexpected."},
+    {cat:"Consequências", titlePT:"Maldição Final", titleEN:"Final Curse", textPT:"Escolha alguém; ambos bebem até o fim da rodada.", textEN:"Choose someone; both drink until the round ends."},
+
+    // Sombras 15
+    {cat:"Sombras", titlePT:"Sussurro das Trevas", titleEN:"Whisper of Darkness", textPT:"Escolha alguém e diga algo enigmático em voz baixa.", textEN:"Choose someone and whisper something mysterious."},
+    {cat:"Sombras", titlePT:"Véu da Noite", titleEN:"Veil of Night", textPT:"Feche os olhos 20s; se alguém falar, responda como oráculo.", textEN:"Close eyes 20s; if spoken to, answer like an oracle."},
+    {cat:"Sombras", titlePT:"Ritual da Escuridão", titleEN:"Ritual of Darkness", textPT:"Todos dão um gole em silêncio absoluto.", textEN:"Everyone takes a sip in complete silence."},
+    {cat:"Sombras", titlePT:"O Nome Esquecido", titleEN:"The Forgotten Name", textPT:"Invente um nome sombrio e use até o fim da rodada.", textEN:"Create a dark new name and use it until round end."},
+    {cat:"Sombras", titlePT:"Chama Negra", titleEN:"Black Flame", textPT:"Faça um brinde como conjurando um feitiço.", textEN:"Toast as if you were casting a spell."},
+    {cat:"Sombras", titlePT:"O Espelho Que Ri", titleEN:"The Laughing Mirror", textPT:"Finja ver algo assustador e reaja dramaticamente.", textEN:"Pretend to see something terrifying and react."},
+    {cat:"Sombras", titlePT:"Grito Mudo", titleEN:"Silent Scream", textPT:"Mime um grito; quem rir, bebe.", textEN:"Mime a scream; whoever laughs drinks."},
+    {cat:"Sombras", titlePT:"Névoa da Verdade", titleEN:"Mist of Truth", textPT:"Pergunta profunda; se 'não sei', ambos bebem.", textEN:"Ask deep question; 'I don't know' = both drink."},
+    {cat:"Sombras", titlePT:"Rastro Sombrio", titleEN:"Shadow's Trail", textPT:"Siga a pessoa à frente como sombra até notar.", textEN:"Follow the person in front like a shadow."},
+    {cat:"Sombras", titlePT:"Olhar do Abismo", titleEN:"Gaze of the Abyss", textPT:"Diga 'O abismo sorri de volta' e brindem.", textEN:"Say 'The abyss smiles back' then toast."},
+    {cat:"Sombras", titlePT:"Voz da Escuridão", titleEN:"Voice of the Dark", textPT:"Diga algo profético e sombrio.", textEN:"Say something prophetic and dark."},
+    {cat:"Sombras", titlePT:"Toque da Penumbra", titleEN:"Touch of Twilight", textPT:"Toque leve e diga 'A sombra te escolheu.'", textEN:"Gently touch and say 'The shadow has chosen you.'"},
+    {cat:"Sombras", titlePT:"Espiral do Destino", titleEN:"Spiral of Fate", textPT:"Apontem; quem mais for apontado, bebe.", textEN:"Everyone points; who gets most fingers drinks."},
+    {cat:"Sombras", titlePT:"Rito da Meia-Noite", titleEN:"Midnight Rite", textPT:"Brinde secreto com alguém; mantenha silêncio.", textEN:"Secret toast with someone; keep the reason secret."},
+    {cat:"Sombras", titlePT:"A Entidade Observa", titleEN:"The Entity Watches", textPT:"Fique imóvel até alguém te perguntar se está bem.", textEN:"Stay still until someone asks if you're okay."},
+
+    // Caos 15
+    {cat:"Caos", titlePT:"A Risada do Abismo", titleEN:"Laughter of the Abyss", textPT:"Ria sem motivo até contagiar alguém.", textEN:"Laugh for no reason until someone joins you."},
+    {cat:"Caos", titlePT:"Loucura Compartilhada", titleEN:"Shared Madness", textPT:"Diga algo ao mesmo tempo com alguém; se sair caos, brindem.", textEN:"Say something simultaneously with someone; chaos = toast."},
+    {cat:"Caos", titlePT:"Carta Selvagem", titleEN:"Wild Card", textPT:"Faça qualquer coisa; se grupo aprovar, todos bebem.", textEN:"Do anything; if group approves, everyone drinks."},
+    {cat:"Caos", titlePT:"Inversão Profana", titleEN:"Profane Reversal", textPT:"Troque papel com alguém até sua próxima vez.", textEN:"Swap roles with someone until your next turn."},
+    {cat:"Caos", titlePT:"Roda da Loucura", titleEN:"Wheel of Madness", textPT:"Girem garrafa; apontado cria regra.", textEN:"Spin a bottle; pointed person invents a rule."},
+    {cat:"Caos", titlePT:"Feitiço Quebrado", titleEN:"Broken Spell", textPT:"Quebre uma regra com estilo; escolha alguém se ninguém notar.", textEN:"Break a rule with flair; if unnoticed, pick someone to drink."},
+    {cat:"Caos", titlePT:"Ecos do Caos", titleEN:"Echoes of Chaos", textPT:"Repita a última frase de forma dramática.", textEN:"Repeat someone's last sentence dramatically."},
+    {cat:"Caos", titlePT:"Ritual da Inversão", titleEN:"Ritual of Reversal", textPT:"Tudo que for 'sim' vira 'não' até fim da rodada.", textEN:"All 'yes' becomes 'no' until round end."},
+    {cat:"Caos", titlePT:"Maldição do Espelho", titleEN:"Mirror's Curse", textPT:"Imite a pessoa à frente por 1 minuto.", textEN:"Imitate the person in front for 1 minute."},
+    {cat:"Caos", titlePT:"A Gargalhada do Demônio", titleEN:"Demon's Cackle", textPT:"Solte sua risada mais insana e contagie o grupo.", textEN:"Let out your wildest laugh and infect the group."},
+    {cat:"Caos", titlePT:"Brinde do Descontrole", titleEN:"Toast of Chaos", textPT:"Brinde de olhos fechados; beba quanto o destino decidir.", textEN:"Toast with eyes closed and drink as fate decides."},
+    {cat:"Caos", titlePT:"Regras do Nada", titleEN:"Rules of Nothing", textPT:"Finja ser mestre do jogo por uma rodada.", textEN:"Act as game master for one round and make rules."},
+    {cat:"Caos", titlePT:"Tempestade de Gritos", titleEN:"Storm of Screams", textPT:"Grite algo aleatório; quem reagir primeiro bebe.", textEN:"Shout something random; who reacts first drinks."},
+    {cat:"Caos", titlePT:"Dom da Loucura", titleEN:"Gift of Madness", textPT:"Diga 'Você carrega um fragmento da minha loucura' e brindem.", textEN:"Say 'You carry a fragment of my madness' and toast."},
+    {cat:"Caos", titlePT:"Fim dos Tempos", titleEN:"End of Times", textPT:"Todos gritam 'Caos!' e bebem; reinicia o jogo.", textEN:"Everyone shouts 'Chaos!' and drinks. Restart the game."},
+
+    // Eclipse raras 15
+    {cat:"Eclipse", titlePT:"Lua Sangrenta", titleEN:"Blood Moon", textPT:"Todos trocam um item de fantasia entre si.", textEN:"Everyone swaps a costume item.", rare:true},
+    {cat:"Eclipse", titlePT:"Ritual da Ressurreição", titleEN:"Ritual of Resurrection", textPT:"Traga alguém de volta (cumpre duas travessuras).", textEN:"Bring someone back; they must do two mischiefs.", rare:true},
+    {cat:"Eclipse", titlePT:"Pacto Proibido", titleEN:"Forbidden Pact", textPT:"Faça aliança: se um beber, o outro bebe também.", textEN:"Make a pact: if one drinks, the other must too.", rare:true},
+    {cat:"Eclipse", titlePT:"Beijo da Escuridão", titleEN:"Kiss of Darkness", textPT:"Sussurre um feitiço sedutor em um ouvido.", textEN:"Whisper a seductive spell into someone's ear.", rare:true},
+    {cat:"Eclipse", titlePT:"Dança do Eclipse", titleEN:"Dance of the Eclipse", textPT:"Todos dançam até alguém rir; quem rir bebe.", textEN:"Everyone dances until someone laughs; they drink.", rare:true},
+    {cat:"Eclipse", titlePT:"Invocação Sombria", titleEN:"Dark Invocation", textPT:"Escolha três jogadores para um desafio coletivo.", textEN:"Pick three players for a collective challenge.", rare:true},
+    {cat:"Eclipse", titlePT:"Julgamento das Sombras", titleEN:"Judgment of Shadows", textPT:"O grupo vota; vencedor dá uma ordem.", textEN:"Group votes; winner gives an order.", rare:true},
+    {cat:"Eclipse", titlePT:"Doce Proibido", titleEN:"Forbidden Sweet", textPT:"Dê um doce; em troca, receba algo surpresa.", textEN:"Give a sweet; receive a surprise in return.", rare:true},
+    {cat:"Eclipse", titlePT:"Sombra do Desejo", titleEN:"Shadow of Desire", textPT:"Diga o primeiro pensamento proibido (ou invente).", textEN:"Say the first forbidden thought or invent one.", rare:true},
+    {cat:"Eclipse", titlePT:"O Último Brinde", titleEN:"The Last Toast", textPT:"Todos brindam 'Pelo Caos Sombrio!'; quem não brindar, paga mico.", textEN:"All toast 'For Dark Chaos!'; who doesn't toast, pays a dare.", rare:true},
+    {cat:"Eclipse", titlePT:"Véu das Ilusões", titleEN:"Veil of Illusions", textPT:"Fique 'invisível' — ninguém pode te escolher por 1 rodada.", textEN:"Become 'invisible' — no one can pick you for 1 round.", rare:true},
+    {cat:"Eclipse", titlePT:"Mão do Destino", titleEN:"Hand of Destiny", textPT:"Você escolhe quem joga as próximas duas cartas.", textEN:"You choose who draws the next two cards.", rare:true},
+    {cat:"Eclipse", titlePT:"Névoa da Loucura", titleEN:"Mist of Madness", textPT:"Todos sussurram até a próxima rodada.", textEN:"Everyone whispers until next round.", rare:true},
+    {cat:"Eclipse", titlePT:"Eclipse Total", titleEN:"Total Eclipse", textPT:"Tirem uma foto ritualística e brindem.", textEN:"Take a ritual photo and toast together.", rare:true},
+    {cat:"Eclipse", titlePT:"O Chamado do Caos", titleEN:"Call of Chaos", textPT:"Reveja uma carta jogada e repita seu efeito.", textEN:"Pick a played card and repeat its effect.", rare:true}
+  ];
+  // ensure exactly 105 by duplicating some if needed (should be 105 already)
+  return deck;
+})();
+
+/* ---------- Small audio helpers (WebAudio synth) ---------- */
+function playTone(freq=880,dur=100,type='sine'){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type; o.frequency.value = freq; g.gain.value = 0.007;
+    o.connect(g); g.connect(ctx.destination); o.start();
+    setTimeout(()=>{ o.stop(); ctx.close(); }, dur);
+  }catch(e){}
+}
+
+/* ---------- App component ---------- */
+function App(){
+  const [lang, setLang] = useState('PT'); // PT or EN
+  const [deck, setDeck] = useState([]);
+  const [discard, setDiscard] = useState([]);
+  const [current, setCurrent] = useState(null);
+  const [showEN, setShowEN] = useState(true);
+  const [soundOn, setSoundOn] = useState(true);
+  const [chaosOn, setChaosOn] = useState(false);
+  const [favorites, setFavorites] = useState([]);
+  const [filter, setFilter] = useState('all');
+  const [mode, setMode] = useState('casual');
+  const [activeConsequences, setActiveConsequences] = useState([]);
+  const [counts, setCounts] = useState({deck:0,discard:0,fav:0});
+
+  // init on mount
+  useEffect(()=>{
+    const saved = localStorage.getItem('codex_state');
+    if(saved){
+      try{
+        const s = JSON.parse(saved);
+        setDeck(s.deck || [...BASE_DECK]);
+        setDiscard(s.discard || []);
+        setFavorites(s.favorites || []);
+        setChaosOn(!!s.chaosOn);
+        setActiveConsequences(s.activeConsequences || []);
+        setLang(s.lang || 'PT');
+      }catch(e){
+        setDeck([...BASE_DECK]);
+      }
+    } else {
+      setDeck([...BASE_DECK]);
+    }
+  },[]);
+
+  // persist
+  useEffect(()=>{ localStorage.setItem('codex_state', JSON.stringify({deck,discard,favorites,chaosOn,activeConsequences,lang})); setCounts({deck:deck.length, discard:discard.length, fav:favorites.length}); }, [deck,discard,favorites,chaosOn,activeConsequences,lang]);
+
+  // helper to shuffle array copy
+  function shuffleArr(arr){ const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+  // draw one card
+  function draw(peek=false){
+    if(deck.length === 0){
+      if(discard.length === 0){ alert(lang==='PT' ? 'Baralho vazio.' : 'Deck empty.'); return; }
+      const newDeck = shuffleArr(discard);
+      setDeck(newDeck); setDiscard([]); // then continue
+    }
+    // build visible list per filter/mode
+    let visible = deck.filter(c => filter==='all' || c.cat===filter);
+    if(mode==='paquera') visible = visible.filter(c => c.cat==='Picantes' || c.cat==='Gostosuras');
+    if(mode==='bebida') visible = visible.filter(c => ['Consequências','Caos','Sombras','Gostosuras'].includes(c.cat));
+    if(chaosOn) visible = visible.concat(BASE_DECK.filter(x=>x.rare)); // allow rares when chaos
+    if(visible.length === 0){ alert(lang==='PT' ? 'Nenhuma carta com esse filtro.' : 'No cards for this filter.'); return; }
+    const idx = Math.floor(Math.random()*visible.length);
+    const card = visible[idx];
+    // animate / show
+    setCurrent(null);
+    setTimeout(()=>{ setCurrent(card); playTone(800,120,'sine'); }, 120);
+    if(!peek){
+      // remove first occurrence from deck
+      const pos = deck.indexOf(card);
+      if(pos >= 0){
+        const nd = [...deck]; nd.splice(pos,1); setDeck(nd);
+      } else {
+        // if card was a rare from BASE_DECK not in deck, do nothing to deck
+      }
+      setDiscard(prev=>[card, ...prev]);
+      if(card.cat==='Consequências') setActiveConsequences(prev=>[card, ...prev]);
+    } else {
+      playTone(440,260,'triangle');
+    }
+  }
+
+  function shuffleDeck(){
+    setDeck(prev => shuffleArr(prev));
+    if(soundOn) playTone(880,100,'sine');
+  }
+
+  function toggleChaos(){
+    setChaosOn(prev => !prev);
+    if(!chaosOn) playTone(440,220,'triangle'); else playTone(660,140,'square');
+  }
+
+  function toggleLanguage(){
+    setLang(prev => prev==='PT' ? 'EN' : 'PT');
+  }
+
+  function toggleSound(){ setSoundOn(s => !s); }
+
+  function addFavorite(){
+    if(!current) return alert(lang==='PT' ? 'Nenhuma carta para favoritar.' : 'No card to favorite.');
+    setFavorites(prev => { const n=[current,...prev]; localStorage.setItem('codex_faves', JSON.stringify(n)); return n; });
+  }
+
+  function resetDeck(){
+    if(!confirm(lang==='PT' ? 'Resetar deck para o padrão?' : 'Reset deck to default?')) return;
+    setDeck([...BASE_DECK]); setDiscard([]); setFavorites([]); setActiveConsequences([]); setChaosOn(false);
+  }
+
+  function exportDeck(){
+    const payload = {deck, discard, favorites, activeConsequences, chaosOn};
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='codex_deck_export.json'; a.click(); URL.revokeObjectURL(url);
+  }
+
+  function importDeck(file){
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try{
+        const parsed = JSON.parse(e.target.result);
+        setDeck(parsed.deck || []); setDiscard(parsed.discard || []); setFavorites(parsed.favorites || []); setActiveConsequences(parsed.activeConsequences || []); setChaosOn(!!parsed.chaosOn);
+        alert(lang==='PT' ? 'Deck importado.' : 'Deck imported.');
+      }catch(err){ alert(lang==='PT' ? 'Erro ao importar.' : 'Import error.'); }
+    };
+    reader.readAsText(file);
+  }
+
+  function fillTo105(){
+    const all = [...deck, ...discard];
+    const baseNonRare = BASE_DECK.filter(c=>!c.rare);
+    while(all.length < 105){ all.push(JSON.parse(JSON.stringify(baseNonRare[Math.floor(Math.random()*baseNonRare.length)]))); }
+    setDeck(all); alert(lang==='PT' ? 'Deck preenchido até 105.' : 'Deck filled to 105.');
+  }
+
+  function renderText(card){
+    if(!card) return {title:'—', pt: lang==='PT' ? 'Toque em Sortear carta' : 'Tap Draw card', en: lang==='EN' ? 'Tap Draw card' : ''};
+    return {title: lang==='PT' ? card.titlePT || card.titleEN : card.titleEN || card.titlePT, pt: card.textPT, en: card.textEN};
+  }
+
+  // populate filter options (unique cats)
+  const categories = Array.from(new Set([...deck.map(d=>d.cat), ...BASE_DECK.map(d=>d.cat)]));
+
+  return e('div',null,
+    e('header',null,
+      e('div',null, e('div',{className:'title'}, 'Codex Profano — Edição Sombria do Caos'), e('div',{className:'subtitle'}, lang==='PT' ? 'O Altar Místico' : 'The Mystic Altar')),
+      e('div',null,
+        e('button',{onClick:toggleLanguage, className:'lang-toggle'}, lang),
+        e('button',{onClick:toggleSound, style:{marginLeft:8}}, soundOn ? '🔊' : '🔈')
+      )
+    ),
+    e('div',{className:'layout'},
+      e('section',{className:'stage'},
+        e('div',{className:'altar'}),
+        e('div',{className:'candle'}),
+        e('div',{className:'controls'},
+          e('button',{className:'primary', onClick:()=>draw(false)}, lang==='PT' ? '🎴 Sortear carta' : '🎴 Draw card'),
+          e('button',{onClick:()=>draw(true)}, lang==='PT' ? '👁️ Espiar (peek)' : '👁️ Peek'),
+          e('button',{onClick:shuffleDeck}, lang==='PT' ? '🔀 Embaralhar' : '🔀 Shuffle'),
+          e('div',{style:{flex:1}}),
+          e('button',{onClick:toggleChaos, className:'invoca'}, chaosOn ? (lang==='PT' ? '🕯️ Caos Invocado (ON)' : '🕯️ Chaos ON') : (lang==='PT' ? '🕯️ Invocar o Caos' : '🕯️ Invoke Chaos'))
+        ),
+        e('div',{className:'cardFrame' + (current ? ' card-anim' : ' card-hidden'), id:'cardFrame'},
+          e('div',{className:'card-cat'}, current ? (current.cat) : (lang==='PT' ? '—' : '—')),
+          e('div',{className:'card-title'}, renderText(current).title),
+          e('div',{className:'card-pt'}, current ? (lang==='PT' ? current.textPT : current.textPT) : (lang==='PT' ? 'Toque em Sortear carta para começar.' : 'Tap Draw card to start.')),
+          e('div',{className:'card-en', style:{display: (lang==='PT' ? 'none' : 'block')}}, current ? (lang==='EN' ? current.textEN : current.textEN) : ''),
+          e('div',{style:{marginTop:10}},
+            e('button',{onClick:()=>setShowEN(s=>!s)}, lang==='PT' ? 'Virar / Esconder tradução' : 'Toggle translation'),
+            e('button',{onClick:addFavorite, style:{marginLeft:8}}, '⭐ ' + (lang==='PT' ? 'Favorita' : 'Favorite'))
+          )
+        ),
+        e('div',{style:{display:'flex',gap:8,justifyContent:'center',marginTop:12}},
+          e('button',{onClick:()=>{ setActiveConsequences([]); alert(lang==='PT' ? 'Consequências limpas.' : 'Consequences cleared.'); }}, lang==='PT' ? 'Limpar Consequências' : 'Clear consequences'),
+          e('button',{onClick:()=>alert(activeConsequences.length? activeConsequences.map((c,i)=>`${i+1}. ${c.titlePT}`).join('\\n') : (lang==='PT' ? 'Nenhuma consequência ativa.' : 'No active consequences.'))}, lang==='PT' ? 'Ver Consequências Ativas' : 'View Active Consequences')
+        )
+      ),
+      e('aside',{className:'sidebar'},
+        e('div',{className:'section'}, e('label',null, lang==='PT' ? 'Filtrar por categoria' : 'Filter by category'),
+          e('select',{value:filter, onChange: (ev)=>setFilter(ev.target.value)},
+            e('option',{value:'all'}, lang==='PT' ? 'Todas' : 'All'),
+            categories.map(c => e('option',{key:c, value:c}, c))
+          ),
+          e('div',{style:{marginTop:8}},
+            e('label',null, lang==='PT' ? 'Modo' : 'Mode'),
+            e('select',{value:mode, onChange:(ev)=>setMode(ev.target.value)},
+              e('option',{value:'casual'}, lang==='PT' ? 'Casual (todas)' : 'Casual (all)'),
+              e('option',{value:'paquera'}, lang==='PT' ? 'Paquera (picantes + gostosuras)' : 'Flirt (spicy + treats)'),
+              e('option',{value:'bebida'}, lang==='PT' ? 'Vamos beber (consequências)' : 'Drink mode (consequences)'),
+              e('option',{value:'caos'}, lang==='PT' ? 'Caos total' : 'Chaos mode')
+            )
+          )
+        ),
+        e('div',{className:'section'},
+          e('label',null, lang==='PT' ? 'Adicionar carta (rápido)' : 'Quick add card'),
+          e('input',{id:'iptPT', placeholder: (lang==='PT' ? 'Título PT' : 'Title PT')}),
+          e('input',{id:'iptEN', placeholder: (lang==='PT' ? 'Título EN' : 'Title EN'), style:{marginTop:6}}),
+          e('textarea',{id:'txtPT', rows:2, placeholder:(lang==='PT'? 'Texto PT':'Text PT'), style:{marginTop:6}}),
+          e('textarea',{id:'txtEN', rows:2, placeholder:(lang==='PT'? 'Texto EN':'Text EN'), style:{marginTop:6}}),
+          e('select',{id:'selCat', style:{marginTop:6}},
+            ['Gostosuras','Picantes','Travessuras','Consequências','Sombras','Caos','Eclipse'].map(c => e('option',{key:c,value:c}, c))
+          ),
+          e('div',{style:{display:'flex',gap:8,marginTop:8}},
+            e('button',{onClick:()=>{ const tpt=document.getElementById('iptPT').value.trim(); const ten=document.getElementById('iptEN').value.trim(); const txtpt=document.getElementById('txtPT').value.trim(); const txten=document.getElementById('txtEN').value.trim(); const cat=document.getElementById('selCat').value; if(!tpt||!txtpt){ alert(lang==='PT' ? 'Preencha título PT e texto PT.' : 'Fill PT title and PT text.'); return; } const obj={cat, titlePT:tpt, titleEN:ten||tpt, textPT:txtpt, textEN:txten||txtpt}; setDeck(prev=>[obj,...prev]); alert(lang==='PT' ? 'Carta adicionada.' : 'Card added.'); }}, lang==='PT' ? '➕ Adicionar' : '➕ Add'),
+            e('button',{onClick:exportDeck}, lang==='PT' ? '📤 Exportar' : '📤 Export'),
+            e('label',{style:{display:'inline-block',padding:'6px 8px',border:'1px solid rgba(255,255,255,0.03)',borderRadius:8,cursor:'pointer',marginLeft:8}}, lang==='PT' ? '📥 Importar' : '📥 Import', e('input',{type:'file',style:{display:'none'}, onChange:(ev)=>importDeck(ev.target.files[0])}))
+          )
+        ),
+        e('div',{className:'section'},
+          e('label',null, lang==='PT' ? 'Favoritas' : 'Favorites'),
+          e('div',{className:'list'}, favorites.length ? favorites.map((f,i)=> e('div',{key:i, style:{marginBottom:6}}, `[${f.cat}] ${lang==='PT'?f.titlePT:f.titleEN}`)) : e('div',null, lang==='PT' ? 'Nenhuma favorita' : 'No favorites'))
+        ),
+        e('div',{className:'section'},
+          e('label',null, lang==='PT' ? 'Baralho' : 'Deck'),
+          e('div',null, `${counts.deck || deck.length} cartas disponíveis · ${counts.discard || discard.length} descartadas`),
+          e('div',{style:{marginTop:8,display:'flex',gap:8}},
+            e('button',{onClick:resetDeck}, lang==='PT' ? '🔄 Resetar' : '🔄 Reset'),
+            e('button',{onClick:()=>{ fillTo105(); }}, '✴️ ' + (lang==='PT' ? 'Completar p/105' : 'Fill to 105'))
+          )
+        ),
+        e('div',{className:'section'}, e('label',null, lang==='PT' ? 'Sons' : 'Sounds'), e('div',null,
+          e('button',{onClick:()=>{ setSoundOn(s=>!s); if(soundOn) playTone(300,100); }}, soundOn ? '🔊 On' : '🔈 Off')
+        )),
+        e('div',{style:{marginTop:8}}, e('small',{className:'small'}, lang==='PT' ? 'Dica: Instale como app via menu do navegador.' : 'Tip: Install via browser menu.'))
+      )
+    ),
+    e('footer',null, e('div',null, lang==='PT' ? 'Criado por uma criatura mágica, demoníaca, amaldiçoada e louca.' : 'Created by a magical, demonic, cursed and mad creature.'))
+  );
+}
+
+/* mount */
+ReactDOM.createRoot(document.getElementById('root')).render(e(App));
+
+/* PWA: register a basic service worker stored as a blob for offline caching */
+if('serviceWorker' in navigator){
+  const swCode = `
+self.addEventListener('install', ev => {
+  ev.waitUntil(caches.open('codex-v1').then(cache=>cache.addAll(['./','./index.html'])).catch(()=>{}));
+  self.skipWaiting();
+});
+self.addEventListener('activate', ev => ev.waitUntil(self.clients.claim()));
+self.addEventListener('fetch', ev => ev.respondWith(fetch(ev.request).catch(()=>caches.match(ev.request))));
+`;
+  const swBlob = new Blob([swCode], {type:'application/javascript'});
+  const swUrl = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swUrl).then(()=>console.log('ServiceWorker registered')).catch(e=>console.warn('SW error', e));
+}
+
+/* small helper tone for button actions */
+function playTone(freq=880,dur=100,type='sine'){ try{ const ctx=new (window.AudioContext||window.webkitAudioContext)(); const o=ctx.createOscillator(); const g=ctx.createGain(); o.type=type; o.frequency.value=freq; g.gain.value=0.007; o.connect(g); g.connect(ctx.destination); o.start(); setTimeout(()=>{ o.stop(); ctx.close(); }, dur);}catch(e){} }
+
+</script>
+</body>
+</html>
